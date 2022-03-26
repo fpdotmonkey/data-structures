@@ -1,7 +1,7 @@
 #ifndef __DATA_STRUCTURES_LINKED_LIST
 #define __DATA_STRUCTURES_LINKED_LIST
 
-#include <climits>
+#include <cassert>
 #include <functional>
 #include <iterator>
 
@@ -11,6 +11,11 @@ template<typename T>
 class LinkedList
 {
 public:
+  static_assert(std::is_same<decltype(T{} == T{}), bool>(),
+                "value type must have `operator==(T&)` defined");
+  static_assert(std::is_same<decltype(T{} != T{}), bool>(),
+                "value type must have `operator!=(T&)` defined");
+
 private:
   struct Element
   {
@@ -19,13 +24,14 @@ private:
   };
 
   Element* first;
+  Element* last;
   size_t number_of_elements;
 
 public:
   /**
     A type for iterating forward through the list.
   */
-  class iterator : std::iterator<std::input_iterator_tag, T>
+  class iterator : std::iterator<std::forward_iterator_tag, T>
   {
   public:
   private:
@@ -37,20 +43,20 @@ public:
       : current(nullptr)
     {}
     iterator& operator++();
-    bool operator==(iterator other);
-    bool operator!=(iterator other);
+    bool operator==(iterator other) const;
+    bool operator!=(iterator other) const;
     T operator*() const;
   };
 
   /**
     An iterator to the start of the list.
   */
-  iterator begin();
+  iterator begin() const;
 
   /**
     An iterator to the terminus of the list.
   */
-  iterator end();
+  iterator end() const;
 
   /**
     Construct the list from the logical contents.
@@ -65,14 +71,24 @@ public:
   LinkedList();
 
   /**
-    There will be no copies nor moves of this class.
-    {
+    Construct a copy of a list.
   */
-  LinkedList(const LinkedList& /*unused*/) = delete;
-  LinkedList& operator=(const LinkedList& /*unused*/) = delete;
-  LinkedList(LinkedList&& /*unused*/) = delete;
-  LinkedList& operator=(LinkedList&& /*unused*/) = delete;
-  /**}*/
+  LinkedList(const LinkedList& other);
+
+  /**
+    Move the list to a new place.
+  */
+  LinkedList(LinkedList&& other) noexcept;
+
+  /**
+    Assign the list a copy of another list.
+  */
+  LinkedList& operator=(const LinkedList& other);
+
+  /**
+    Move data from another list to this list.
+  */
+  LinkedList& operator=(LinkedList&& other) noexcept;
 
   /**
     Destroy the list.
@@ -82,40 +98,52 @@ public:
   /**
     The number of elements in the list.
   */
-  size_t size();
+  size_t size() const;
 
   /**
     Check if there are exactly 0 elements in the list.
   */
-  bool empty();
+  bool empty() const;
 
   /**
     Check if this and that list have equal data.
 
     @param  other   A list whose equality you're interested in
   */
-  bool operator==(LinkedList<T>& other);
+  bool operator==(const LinkedList<T>& other) const;
 
   /**
     Check if this and that list have inequal data.
 
     @param  other   A list whose inequality you're interested in
   */
-  bool operator!=(LinkedList<T>& other);
+  bool operator!=(const LinkedList<T>& other) const;
 
   /**
     The value of the first item in the list.
 
+    Should the list be empty, this method will result in undefined
+    behaviour, likely a crash.
+
     @return The datum beginning the list
+    {
   */
   T& front();
+  const T& cfront() const;
+  /**}*/
 
   /**
     The value of the last item in the list.
 
+    Should the list be empty, this method will result in undefined
+    behaviour, likely a crash.
+
     @return The datum terminating the list
+    {
   */
   T& back();
+  const T& cback() const;
+  /**}*/
 
   /**
     Add the given value to the beginning of the list.
@@ -134,12 +162,18 @@ public:
   /**
     Remove the first item from the list and return it.
 
+    Should the list be empty, this method will result in undefined
+    behaviour, likely a crash.
+
     @return The datum formerly at the start of the list
   */
   T pop_front();
 
   /**
     Remove the last item from the list and return it.
+
+    Should the list be empty, this method will result in undefined
+    behaviour, likely a crash.
 
     @return The datum that was previously the list's last
   */
@@ -166,6 +200,24 @@ public:
   */
   void map(std::function<T(const T&)> closure);
 };
+
+template<typename T>
+bool
+operator==(const LinkedList<T>& a, const LinkedList<T>& b);
+
+template<typename T>
+bool
+operator!=(const LinkedList<T>& a, const LinkedList<T>& b);
+
+template<typename T>
+bool
+operator==(typename LinkedList<T>::iterator a,
+           typename LinkedList<T>::iterator b);
+
+template<typename T>
+bool
+operator!=(typename LinkedList<T>::iterator a,
+           typename LinkedList<T>::iterator b);
 
 #include "LinkedList.inl"
 

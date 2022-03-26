@@ -14,11 +14,24 @@ CXXFLAGS:=\
   -O0 -g3 \
   -I./$(SOURCE_DIRECTORY) \
   -Wall -Wextra -Wpedantic -Werror \
+  --coverage \
+  #
+
+LDFLAGS:=\
+  -pthread \
+  #
+
+LDLIBS:=\
+  -lgtest \
+  -lgtest_main \
+  -fprofile-arcs \
   #
 
 LINTFLAGS:=\
   --quiet \
   -- \
+  $(LDFLAGS) \
+  $(LDLIBS) \
   $(CXXFLAGS) \
   #
 
@@ -37,27 +50,45 @@ memcheck: test
 	  echo "valgrind is needed for memcheck"; \
 	  exit 1; \
 	fi
-	$(shell valgrind --leak-check=yes ./$(TEST_TARGET))
+	valgrind --leak-check=yes $(TEST_TARGET)
 
 .PHONY: test
 test: build
 	if ! ./$(TEST_TARGET); then exit 2; fi
 
 .PHONY: build
-build: lint $(TEST_TARGET)
+build: $(TEST_TARGET)
 
-.PHONY: lint
-lint: $(SOURCES)
-	$(LINT) $(SOURCE_DIRECTORY)/*.cxx $(SOURCE_DIRECTORY)/*.h $(LINTFLAGS)
+.PHONY: coverage
+coverage: test
+	mkdir --parents $(BUILD_DIRECTORY)/gcov $(BUILD_DIRECTORY)/lcov
+	gcov \
+		--relative-only \
+		--branch-probabilities $(SOURCES) \
+		--object-directory $(OBJECTS)
+	mv *.gcov $(BUILD_DIRECTORY)/gcov
+	@if ! lcov --version >/dev/null; then \
+		echo "install lcov to see a visual coverage report"; \
+		exit 0; \
+	fi
+	lcov \
+		--capture \
+		--directory $(BUILD_DIRECTORY) \
+		--output-file $(BUILD_DIRECTORY)/lcov/main_coverage.info
+	genhtml \
+		$(BUILD_DIRECTORY)/lcov/main_coverage.info \
+		--output-directory $(BUILD_DIRECTORY)/lcov/
+	@echo
+	@echo "View the coverage report at file://$(shell pwd)/$(BUILD_DIRECTORY)/lcov/index.html"
 
 $(BUILD_DIRECTORY)/%.o: $(SOURCE_DIRECTORY)/%.cxx
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(TEST_TARGET): $(OBJECTS)
-	$(CXX) $^ -o $@ $(LDLIBS)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
 .PHONY: clean
 clean:
-	rm -f $(BUILD_DIRECTORY)/*
+	rm -rf $(BUILD_DIRECTORY)/*
 
 -include $(DEPENDENCIES)
