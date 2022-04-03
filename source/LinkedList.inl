@@ -1,8 +1,5 @@
 // inlined in LinkedList.h
 
-#include <cstdlib>
-#include <stdexcept>
-
 template<typename T>
 DataStructures::LinkedList<T>::iterator::iterator(Element* start)
 {
@@ -10,7 +7,7 @@ DataStructures::LinkedList<T>::iterator::iterator(Element* start)
 }
 
 template<typename T>
-typename DataStructures::LinkedList<T>::iterator&
+typename LinkedList<T>::iterator&
 DataStructures::LinkedList<T>::iterator::operator++()
 {
   current = current->next;
@@ -19,14 +16,14 @@ DataStructures::LinkedList<T>::iterator::operator++()
 
 template<typename T>
 bool
-DataStructures::LinkedList<T>::iterator::operator==(iterator other)
+DataStructures::LinkedList<T>::iterator::operator==(const iterator other) const
 {
   return current == other.current;
 }
 
 template<typename T>
 bool
-DataStructures::LinkedList<T>::iterator::operator!=(iterator other)
+DataStructures::LinkedList<T>::iterator::operator!=(const iterator other) const
 {
   return current != other.current;
 }
@@ -39,40 +36,31 @@ DataStructures::LinkedList<T>::iterator::operator*() const
 }
 
 template<typename T>
-typename DataStructures::LinkedList<T>::iterator
-DataStructures::LinkedList<T>::begin()
+typename LinkedList<T>::iterator
+DataStructures::LinkedList<T>::begin() const
 {
-  DataStructures::LinkedList<T>::iterator begin{ first };
+  LinkedList<T>::iterator begin{ first };
   return begin;
 }
 
 template<typename T>
-typename DataStructures::LinkedList<T>::iterator
-DataStructures::LinkedList<T>::end()
+typename LinkedList<T>::iterator
+DataStructures::LinkedList<T>::end() const
 {
-  return DataStructures::LinkedList<T>::iterator{};
-}
-
-template<typename T>
-static void
-assert_type_has_operator_equal_and_nequal()
-{
-  T a;
-  static_assert(std::is_same<decltype(a == a), bool>(),
-                "value type must have `operator==(T&)` defined");
-  static_assert(std::is_same<decltype(a != a), bool>(),
-                "value type must have `operator!=(T&)` defined");
+  return LinkedList<T>::iterator{};
 }
 
 template<typename T>
 DataStructures::LinkedList<T>::LinkedList(std::initializer_list<T> contents)
 {
-  assert_type_has_operator_equal_and_nequal<T>();
   number_of_elements = contents.size();
+  last = nullptr;
 
   Element* next = nullptr;
   for (auto it = std::crbegin(contents); it != std::crend(contents); ++it) {
     Element* current = new Element{ *it, next };
+    if (last == nullptr)
+      last = current;
     next = current;
   }
   first = next;
@@ -81,9 +69,72 @@ DataStructures::LinkedList<T>::LinkedList(std::initializer_list<T> contents)
 template<typename T>
 DataStructures::LinkedList<T>::LinkedList()
 {
-  assert_type_has_operator_equal_and_nequal<T>();
   number_of_elements = 0;
   first = nullptr;
+  last = nullptr;
+}
+
+template<typename T>
+DataStructures::LinkedList<T>::LinkedList(const LinkedList& other)
+{
+  number_of_elements = 0;
+  *this = other;
+}
+
+template<typename T>
+LinkedList<T>&
+DataStructures::LinkedList<T>::operator=(const LinkedList& other)
+{
+  if (!empty())
+    clear();
+  first = nullptr;
+  number_of_elements = other.size();
+  Element* previous;
+  for (auto it = other.begin(); it != other.end(); ++it) {
+    Element* next = new Element{ *it, nullptr };
+    if (first == nullptr) {
+      first = next;
+    } else {
+      previous->next = next;
+    }
+    previous = next;
+  }
+  last = previous;
+  return *this;
+}
+
+template<typename T>
+DataStructures::LinkedList<T>::LinkedList(LinkedList&& other) noexcept
+{
+  first = other.first;
+  last = other.last;
+  number_of_elements = other.number_of_elements;
+
+  other.first = nullptr;
+  other.last = nullptr;
+  other.number_of_elements = 0;
+}
+
+template<typename T>
+LinkedList<T>&
+DataStructures::LinkedList<T>::operator=(LinkedList&& other) noexcept
+{
+  if (this == &other)
+    return *this;
+
+  Element* new_first = other.first;
+  Element* new_last = other.last;
+  size_t new_number_of_elements = other.number_of_elements;
+
+  other.first = first;
+  other.last = last;
+  other.number_of_elements = number_of_elements;
+
+  first = new_first;
+  last = new_last;
+  number_of_elements = new_number_of_elements;
+
+  return *this;
 }
 
 template<typename T>
@@ -94,21 +145,21 @@ DataStructures::LinkedList<T>::~LinkedList()
 
 template<typename T>
 size_t
-DataStructures::LinkedList<T>::size()
+DataStructures::LinkedList<T>::size() const
 {
   return number_of_elements;
 }
 
 template<typename T>
 bool
-DataStructures::LinkedList<T>::empty()
+DataStructures::LinkedList<T>::empty() const
 {
   return number_of_elements == 0;
 }
 
 template<typename T>
 bool
-DataStructures::LinkedList<T>::operator==(LinkedList<T>& other)
+DataStructures::LinkedList<T>::operator==(const LinkedList<T>& other) const
 {
   if (other.size() != number_of_elements)
     return false;
@@ -126,7 +177,7 @@ DataStructures::LinkedList<T>::operator==(LinkedList<T>& other)
 
 template<typename T>
 bool
-DataStructures::LinkedList<T>::operator!=(LinkedList<T>& other)
+DataStructures::LinkedList<T>::operator!=(const LinkedList<T>& other) const
 {
   return !operator==(other);
 }
@@ -135,6 +186,15 @@ template<typename T>
 T&
 DataStructures::LinkedList<T>::front()
 {
+  assert(!empty());
+  return first->datum;
+}
+
+template<typename T>
+const T&
+DataStructures::LinkedList<T>::cfront() const
+{
+  assert(!empty());
   return first->datum;
 }
 
@@ -142,14 +202,16 @@ template<typename T>
 T&
 DataStructures::LinkedList<T>::back()
 {
-  for (Element* current_element = first; current_element != nullptr;
-       current_element = current_element->next) {
-    if (current_element->next == nullptr) {
-      return current_element->datum;
-    }
-  }
-  // This shouldn't be reached
-  return first->datum;
+  assert(!empty());
+  return last->datum;
+}
+
+template<typename T>
+const T&
+DataStructures::LinkedList<T>::cback() const
+{
+  assert(!empty());
+  return last->datum;
 }
 
 template<typename T>
@@ -165,18 +227,20 @@ template<typename T>
 void
 DataStructures::LinkedList<T>::push_back(const T& new_value)
 {
-  number_of_elements += 1;
   Element* new_last = new Element{ new_value, nullptr };
-  Element* old_last = first;
-  while (old_last->next != nullptr)
-    old_last = old_last->next;
-  old_last->next = new_last;
+  if (!empty())
+    last->next = new_last;
+  else
+    first = new_last;
+  last = new_last;
+  number_of_elements += 1;
 }
 
 template<typename T>
 T
 DataStructures::LinkedList<T>::pop_front()
 {
+  assert(!empty());
   Element* old_first = first;
   first = first->next;
   number_of_elements -= 1;
@@ -190,6 +254,7 @@ template<typename T>
 T
 DataStructures::LinkedList<T>::pop_back()
 {
+  assert(!empty());
   T old_last_datum;
   if (first->next == nullptr) {
     old_last_datum = first->datum;
@@ -199,15 +264,14 @@ DataStructures::LinkedList<T>::pop_back()
     return old_last_datum;
   }
 
-  Element* previous_element = first;
-  Element* current_element = first->next;
-  while (current_element->next != nullptr) {
-    previous_element = current_element;
-    current_element = current_element->next;
+  Element* new_last = first;
+  while (new_last->next != last) {
+    new_last = new_last->next;
   }
-  old_last_datum = current_element->datum;
-  delete current_element;
-  previous_element->next = nullptr;
+  old_last_datum = last->datum;
+  delete last;
+  new_last->next = nullptr;
+  last = new_last;
   number_of_elements -= 1;
   return old_last_datum;
 }
@@ -224,6 +288,7 @@ DataStructures::LinkedList<T>::clear()
     current = next;
   }
   first = nullptr;
+  last = nullptr;
   number_of_elements = 0;
 }
 
@@ -231,6 +296,8 @@ template<typename T>
 bool
 DataStructures::LinkedList<T>::remove(const T& value)
 {
+  if (empty())
+    return false;
   if (first->datum == value) {
     Element* old_first = first;
     first = first->next;
@@ -262,4 +329,34 @@ DataStructures::LinkedList<T>::map(std::function<T(const T&)> closure)
     current_element->datum = closure(current_element->datum);
     current_element = current_element->next;
   }
+}
+
+template<typename T>
+bool
+operator==(const LinkedList<T>& a, const LinkedList<T>& b)
+{
+  return a.operator==(b);
+}
+
+template<typename T>
+bool
+operator!=(const LinkedList<T>& a, const LinkedList<T>& b)
+{
+  return a.operator!=(b);
+}
+
+template<typename T>
+bool
+operator==(typename LinkedList<T>::iterator a,
+           typename LinkedList<T>::iterator b)
+{
+  return a.operator==(b);
+}
+
+template<typename T>
+bool
+operator!=(typename LinkedList<T>::iterator a,
+           typename LinkedList<T>::iterator b)
+{
+  return a.operator!=(b);
 }
